@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLYNET NOC - Manual Operativo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --bg-dark: #0B0F19;
+            --bg-sidebar: #111827;
+            --bg-card: #1F2937;
+            --primary: #3B82F6;
+            --accent: #10B981;
+            --text-main: #F3F4F6;
+            --text-muted: #9CA3AF;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+        }
+
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Scrollbar custom */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-sidebar); }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4B5563; }
+
+        /* Pestañas */
+        .tab-pane { display: none; }
+        .tab-pane.active { display: flex; }
+
+        /* Botones Sidebar Activo */
+        .nav-btn.active {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: #60A5FA;
+            border-right: 3px solid #3B82F6;
+        }
+
+        #sidebar { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #sidebar.collapsed { width: 5.5rem; }
+        
+        #sidebar.collapsed .sidebar-text,
+        #sidebar.collapsed .logo-text,
+        #sidebar.collapsed .sidebar-section-title,
+        #sidebar.collapsed .profile-info { 
+            display: none; 
+        }
+        
+        #sidebar.collapsed .nav-btn { 
+            justify-content: center; 
+            padding-left: 0.5rem; 
+            padding-right: 0.5rem; 
+        }
+        
+        #sidebar.collapsed .header-container,
+        #sidebar.collapsed .footer-container { 
+            justify-content: center; 
+            padding-left: 0; 
+            padding-right: 0; 
+        }
+        
+        #sidebar.collapsed .header-container > div,
+        #sidebar.collapsed .footer-container > div {
+            justify-content: center;
+            width: 100%;
+        }
+
+        #sidebar.collapsed .nav-btn i { 
+            margin-right: 0; 
+            font-size: 1.25rem; 
+        }
+        
+        #sidebar.collapsed #sidebar-toggle-icon { 
+            transform: rotate(180deg); 
+        }
+
+        .led { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #111; margin: 0 auto; box-shadow: inset 0px 1px 3px rgba(0,0,0,0.6); transition: all 0.2s; }
+        .led.green { background-color: #10B981; box-shadow: 0 0 8px #10B981, inset 0px 1px 2px rgba(255,255,255,0.4); }
+        .led.red { background-color: #EF4444; box-shadow: 0 0 8px #EF4444, inset 0px 1px 2px rgba(255,255,255,0.4); }
+        .led.off { background-color: #374151; }
+        .blink-green { animation: blink-g 1s infinite; }
+        .blink-red { animation: blink-r 1s infinite; }
+        @keyframes blink-g { 0%, 100% { background-color: #10B981; box-shadow: 0 0 8px #10B981; } 50% { background-color: #374151; box-shadow: none; } }
+        @keyframes blink-r { 0%, 100% { background-color: #EF4444; box-shadow: 0 0 8px #EF4444; } 50% { background-color: #374151; box-shadow: none; } }
+
+        .node {
+            position: absolute; transform: translate(-50%, -50%);
+            background: #1F2937; border: 2px solid #3B82F6; border-radius: 8px;
+            padding: 8px 12px; text-align: center; font-weight: 600; font-size: 13px;
+            z-index: 10; box-shadow: 0 4px 6px rgba(0,0,0,0.5); transition: all 0.3s ease;
+            width: 120px;
+        }
+        .node-offline { border-color: #4B5563; color: #6B7280; background: #111827; }
+        .node-cabal-offline { border-color: #EF4444; background: rgba(239, 68, 68, 0.15); color: #EF4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+        .node-cabal-online { border-color: #10B981; background: rgba(16, 185, 129, 0.15); color: #10B981; box-shadow: 0 0 15px rgba(16, 185, 129, 0.5); }
+        .link-line { stroke: #374151; stroke-width: 4; stroke-linecap: round; transition: all 0.3s; }
+        .flow-active { stroke: #10B981; stroke-dasharray: 8 8; animation: dash 1s linear infinite; filter: drop-shadow(0 0 4px #10B981); }
+        .flow-backup { stroke: #F59E0B; stroke-dasharray: 8 8; animation: dash 1s linear infinite; filter: drop-shadow(0 0 4px #F59E0B); }
+        .flow-cut { stroke: #EF4444; stroke-dasharray: 4 12; opacity: 0.4; }
+        .flow-loop { stroke: #EF4444 !important; stroke-width: 8; stroke-dasharray: 15 10; animation: dash-reverse 0.3s linear infinite, glow-red 0.5s ease-in-out infinite alternate !important; }
+        .screen-loop { animation: bg-loop-alert 0.5s infinite; }
+        @keyframes dash { to { stroke-dashoffset: -16; } }
+        @keyframes dash-reverse { to { stroke-dashoffset: 25; } }
+        @keyframes glow-red { from { filter: drop-shadow(0 0 5px #EF4444); } to { filter: drop-shadow(0 0 20px #EF4444); } }
+        @keyframes bg-loop-alert { 0%, 100% { background-color: var(--bg-dark); } 50% { background-color: rgba(239, 68, 68, 0.15); } }
+
+        /* Toggles Switch Custom */
+        .toggle-checkbox:checked { right: 0; border-color: #3B82F6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #3B82F6; }
+        .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden selection:bg-blue-500 selection:text-white" id="main-body">
+
+    <aside id="sidebar" class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col z-50 shadow-2xl shrink-0 relative transition-all duration-300">
+        
+        <!-- Botón Toggle Flotante -->
+        <button onclick="toggleSidebar()" class="absolute -right-3 top-5 bg-gray-800 border border-gray-700 text-gray-300 hover:text-white hover:bg-gray-700 rounded-full w-6 h-6 flex items-center justify-center shadow-lg transition-colors z-50 focus:outline-none">
+            <i id="sidebar-toggle-icon" class="fas fa-chevron-left text-[10px] transition-transform duration-300"></i>
+        </button>
+
+        <!-- Header Sidebar -->
+        <div class="header-container h-16 flex items-center px-6 border-b border-gray-800 transition-all duration-300">
+            <div class="flex items-center gap-3 w-full">
+                <div class="bg-blue-600 p-2 rounded-lg text-white shrink-0">
+                    <i class="fas fa-network-wired"></i>
+                </div>
+                <div class="logo-text overflow-hidden whitespace-nowrap transition-all duration-300">
+                    <h1 class="text-sm font-bold text-white leading-tight">FLYNET <span class="text-blue-400">NOC</span></h1>
+                    <p class="text-[10px] text-gray-400 uppercase tracking-widest">Manual Operativo</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menú de Navegación -->
+        <nav class="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 space-y-1">
+            <button onclick="openTab('tab-dashboard')" id="btn-tab-dashboard" class="nav-btn active w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 transition-colors">
+                <i class="fas fa-server w-6 text-center shrink-0"></i> 
+                <span class="sidebar-text whitespace-nowrap ml-2">Dashboard & Pass</span>
+            </button>
+            <button onclick="openTab('tab-antenas')" id="btn-tab-antenas" class="nav-btn w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 transition-colors">
+                <i class="fas fa-satellite-dish w-6 text-center shrink-0"></i> 
+                <span class="sidebar-text whitespace-nowrap ml-2">Antenas (Ubiquiti)</span>
+            </button>
+            <button onclick="openTab('tab-fibra')" id="btn-tab-fibra" class="nav-btn w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 transition-colors">
+                <i class="fas fa-project-diagram w-6 text-center shrink-0"></i> 
+                <span class="sidebar-text whitespace-nowrap ml-2">Fibra Óptica (ONU)</span>
+            </button>
+            <button onclick="openTab('tab-routers')" id="btn-tab-routers" class="nav-btn w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 transition-colors">
+                <i class="fas fa-wifi w-6 text-center shrink-0"></i> 
+                <span class="sidebar-text whitespace-nowrap ml-2">Routers (Ruijie)</span>
+            </button>
+            <button onclick="openTab('tab-mikrotik')" id="btn-tab-mikrotik" class="nav-btn w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 transition-colors">
+                <i class="fas fa-microchip w-6 text-center shrink-0"></i> 
+                <span class="sidebar-text whitespace-nowrap ml-2">MikroTik & Red</span>
+            </button>
+            
+            <div class="sidebar-section-title pt-4 pb-2 transition-all duration-300">
+                <p class="px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Simuladores</p>
+            </div>
+            <button onclick="openTab('tab-cabal')" id="btn-tab-cabal" class="nav-btn w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 transition-colors border border-blue-900/30">
+                <i class="fas fa-route w-6 text-center text-blue-400 shrink-0"></i> 
+                <span class="sidebar-text whitespace-nowrap ml-2">Topología CABAL</span>
+            </button>
+            
+            <div class="sidebar-section-title pt-4 pb-2 transition-all duration-300">
+                <p class="px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">Operaciones</p>
+            </div>
+            <button onclick="openTab('tab-noche')" id="btn-tab-noche" class="nav-btn w-full flex items-center px-3 py-2.5 text-sm font-medium text-yellow-500 rounded-lg hover:bg-gray-800 transition-colors">
+                <i class="fas fa-moon w-6 text-center shrink-0"></i> 
+                <span class="sidebar-text whitespace-nowrap ml-2">Turno Noche / UFINET</span>
+            </button>
+        </nav>
+
+        <!-- Footer Sidebar (Perfil) -->
+        <div class="footer-container p-4 border-t border-gray-800 bg-gray-900/50 transition-all duration-300">
+            <div class="flex items-center gap-3 w-full">
+                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0">T</div>
+                <div class="profile-info overflow-hidden whitespace-nowrap transition-all duration-300">
+                    <p class="text-sm font-medium text-white leading-none">Técnico NOC</p>
+                    <p class="text-xs text-green-400 mt-1 flex items-center"><span class="w-2 h-2 rounded-full bg-green-500 mr-1.5 animate-pulse"></span> En turno</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0 bg-[#0B0F19] transition-all duration-300">
+        
+        <!-- Top Header General -->
+        <header class="h-16 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-8 shrink-0 shadow-sm z-40">
+            <h2 id="header-title" class="text-lg font-semibold text-white">Dashboard Principal</h2>
+            <div class="text-right">
+                <div id="clock-time" class="text-xl font-mono font-bold text-blue-400 tracking-tight leading-none">--:--:--</div>
+                <div id="clock-date" class="text-[10px] text-gray-400 uppercase tracking-widest mt-1">---</div>
+            </div>
+        </header>
+
+        <!-- Contenedor de Pestañas (Relative para superponerlas) -->
+        <main class="flex-1 relative overflow-hidden">
+            
+            <!-- ==========================================
+                 TAB 1: DASHBOARD & PASS
+            =========================================== -->
+            <div id="tab-dashboard" class="tab-pane active absolute inset-0 flex-col overflow-y-auto p-8">
+                <div class="max-w-6xl mx-auto w-full space-y-6">
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Credenciales Equipos -->
+                        <div class="lg:col-span-2 bg-gray-800 rounded-xl border border-gray-700 shadow-sm overflow-hidden">
+                            <div class="bg-gray-800/50 border-b border-gray-700 p-4">
+                                <h3 class="font-semibold text-white flex items-center"><i class="fas fa-key text-blue-400 mr-2"></i> Credenciales de Equipos</h3>
+                            </div>
+                            <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Mikrotik / OLT -->
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 flex justify-between items-center group">
+                                    <div><p class="text-xs text-gray-400 mb-0.5">MikroTik / OLT</p><p class="font-mono text-sm text-green-400">ubnt <span class="text-gray-500">/</span> 426554ajg3f</p></div>
+                                    <button onclick="copyText('426554ajg3f')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                </div>
+                                <!-- Mikrotik Admin -->
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 flex justify-between items-center group">
+                                    <div><p class="text-xs text-gray-400 mb-0.5">MikroTik (Fadmin)</p><p class="font-mono text-sm text-green-400">fadmin <span class="text-gray-500">/</span> 426554ajg3!</p></div>
+                                    <button onclick="copyText('426554ajg3!')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                </div>
+                                <!-- Ubiquiti -->
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 flex justify-between items-center group">
+                                    <div><p class="text-xs text-gray-400 mb-0.5">Antenas Ubiquiti</p><p class="font-mono text-sm text-green-400">ubnt <span class="text-gray-500">/</span> FlyneT@1</p></div>
+                                    <button onclick="copyText('FlyneT@1')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                </div>
+                                <!-- C-DATA ONU -->
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 flex justify-between items-center group">
+                                    <div><p class="text-xs text-gray-400 mb-0.5">ONU C-DATA</p><p class="font-mono text-sm text-green-400">adminisp <span class="text-gray-500">/</span> adminisp</p></div>
+                                    <button onclick="copyText('adminisp')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                </div>
+                                <!-- ZTE F660 / F670L -->
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 flex justify-between items-center group">
+                                    <div><p class="text-xs text-gray-400 mb-0.5">ONU ZTE F660 / F670L</p><p class="font-mono text-sm text-green-400">admin <span class="text-gray-500">/</span> FlyneT@1</p></div>
+                                    <button onclick="copyText('FlyneT@1')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                </div>
+                                <!-- Cambium -->
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 flex justify-between items-center group">
+                                    <div><p class="text-xs text-gray-400 mb-0.5">Cambium</p><p class="font-mono text-sm text-green-400">installer <span class="text-gray-500">/</span> installer</p></div>
+                                    <button onclick="copyText('installer')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sistemas Externos -->
+                        <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-sm overflow-hidden flex flex-col">
+                            <div class="bg-gray-800/50 border-b border-gray-700 p-4">
+                                <h3 class="font-semibold text-white flex items-center"><i class="fas fa-link text-blue-400 mr-2"></i> Sistemas Externos</h3>
+                            </div>
+                            <div class="p-4 flex-1 space-y-3">
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 group">
+                                    <div class="text-xs text-gray-400 mb-1">ISP Manager</div>
+                                    <div class="flex justify-between items-center">
+                                        <a href="https://168.227.22.21:9996" target="_blank" class="text-blue-400 hover:text-blue-300 font-mono text-sm hover:underline">https://168.227.22.21:9996</a>
+                                        <button onclick="copyText('https://168.227.22.21:9996')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 group">
+                                    <div class="text-xs text-gray-400 mb-1">Servidor de Películas</div>
+                                    <div class="flex justify-between items-center">
+                                        <a href="http://168.227.22.18" target="_blank" class="text-blue-400 hover:text-blue-300 font-mono text-sm hover:underline">168.227.22.18</a>
+                                        <button onclick="copyText('168.227.22.18')" class="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100"><i class="far fa-copy"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Comandos Rápidos -->
+                        <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-sm overflow-hidden">
+                            <div class="bg-gray-800/50 border-b border-gray-700 p-4">
+                                <h3 class="font-semibold text-white flex items-center"><i class="fas fa-terminal text-yellow-400 mr-2"></i> Atajos y Comandos Bot</h3>
+                            </div>
+                            <div class="p-0">
+                                <table class="w-full text-sm text-left">
+                                    <tbody class="divide-y divide-gray-700/50">
+                                        <tr class="hover:bg-gray-700/30 transition">
+                                            <td class="px-4 py-3 text-gray-300">Caída de Torre <span class="text-xs text-gray-500 block mt-0.5">Pedir: Dir, Ref, NC, Ticket, Nombre</span></td>
+                                            <td class="px-4 py-3 text-right"><code class="bg-gray-900 text-yellow-400 px-2 py-1 rounded">/torre</code></td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-700/30 transition">
+                                            <td class="px-4 py-3 text-gray-300">Caída de OLT (Fibra)</td>
+                                            <td class="px-4 py-3 text-right"><code class="bg-gray-900 text-yellow-400 px-2 py-1 rounded">/fibra</code></td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-700/30 transition">
+                                            <td class="px-4 py-3 text-gray-300">Pagos en línea</td>
+                                            <td class="px-4 py-3 text-right"><code class="bg-gray-900 text-yellow-400 px-2 py-1 rounded">/aventas, /pagar</code></td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-700/30 transition">
+                                            <td class="px-4 py-3 text-gray-300">Soporte General</td>
+                                            <td class="px-4 py-3 text-right"><code class="bg-gray-900 text-yellow-400 px-2 py-1 rounded">/soporte, /megapolis</code></td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-700/30 transition">
+                                            <td class="px-4 py-3 text-gray-300">Gestión MACs</td>
+                                            <td class="px-4 py-3 text-right"><code class="bg-gray-900 text-yellow-400 px-2 py-1 rounded">/mac/borrar/Activo</code></td>
+                                        </tr>
+                                        <tr class="hover:bg-gray-700/30 transition">
+                                            <td class="px-4 py-3 text-gray-300">Sin Stock (SBT)</td>
+                                            <td class="px-4 py-3 text-right"><code class="bg-gray-900 text-yellow-400 px-2 py-1 rounded">/sbtfreeze</code></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Core e IPs -->
+                        <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-sm overflow-hidden">
+                            <div class="bg-gray-800/50 border-b border-gray-700 p-4">
+                                <h3 class="font-semibold text-white flex items-center"><i class="fas fa-server text-purple-400 mr-2"></i> Equipos Core y DC</h3>
+                            </div>
+                            <div class="p-4 grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Enrutamiento (BGP)</h4>
+                                    <ul class="space-y-2">
+                                        <li class="flex justify-between items-center"><span class="text-gray-300">CORE</span> <code class="text-purple-400 font-mono">1.10.2.2</code></li>
+                                        <li class="flex justify-between items-center"><span class="text-gray-300">LUMEN</span> <code class="text-purple-400 font-mono">10.2.55.23</code></li>
+                                        <li class="flex justify-between items-center"><span class="text-gray-300">CS</span> <code class="text-purple-400 font-mono">10.50.0.6</code></li>
+                                        <li class="flex justify-between items-center"><span class="text-gray-300">GG</span> <code class="text-purple-400 font-mono">10.33.1.2</code></li>
+                                        <li class="flex justify-between items-center"><span class="text-gray-300">S. Luis</span> <code class="text-purple-400 font-mono">10.9.1.2</code></li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Data Center</h4>
+                                    <ul class="space-y-2">
+                                        <li class="flex flex-col"><span class="text-gray-300">DATA CENTER</span> <code class="text-blue-400 font-mono mt-0.5 bg-gray-900/50 px-2 py-0.5 rounded w-fit">10.255.255.200</code></li>
+                                        <li class="flex flex-col"><span class="text-gray-300">FIREWALL DC</span> <code class="text-blue-400 font-mono mt-0.5 bg-gray-900/50 px-2 py-0.5 rounded w-fit">10.255.255.201</code></li>
+                                        <li class="flex flex-col"><span class="text-gray-300">NAT MIAMI</span> <code class="text-blue-400 font-mono mt-0.5 bg-gray-900/50 px-2 py-0.5 rounded w-fit">10.255.255.202</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 TAB 2: ANTENAS
+            =========================================== -->
+            <div id="tab-antenas" class="tab-pane absolute inset-0 flex-col overflow-y-auto p-8">
+                <div class="max-w-5xl mx-auto w-full space-y-6">
+                    <h2 class="text-2xl font-bold text-white mb-2">Diagnóstico de Antenas (Ubiquiti)</h2>
+                    <p class="text-gray-400 mb-6">Guía rápida para resolver problemas de lentitud e intermitencia en enlaces WISP.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h4 class="font-bold text-white mb-3 flex items-center"><i class="fas fa-signal text-green-400 mr-2"></i> 1. Signal (Señal)</h4>
+                            <p class="text-sm text-gray-300 mb-2">Fuerza de la conexión física.</p>
+                            <div class="bg-gray-900/50 p-2 rounded text-sm mb-1 border-l-2 border-green-500"><span class="text-green-400 font-bold">-45 a -60 dBm:</span> Excelente</div>
+                            <div class="bg-gray-900/50 p-2 rounded text-sm border-l-2 border-red-500"><span class="text-red-400 font-bold">-70 a -80 dBm:</span> Malo (Antena movida o árbol)</div>
+                        </div>
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h4 class="font-bold text-white mb-3 flex items-center"><i class="fas fa-wave-square text-blue-400 mr-2"></i> 2. Noise (Ruido)</h4>
+                            <p class="text-sm text-gray-300 mb-2">Interferencia del entorno (SNR).</p>
+                            <div class="bg-gray-900/50 p-2 rounded text-sm mb-1 border-l-2 border-blue-500"><span class="text-blue-400 font-bold">Azul/Verde:</span> Aire limpio</div>
+                            <div class="bg-gray-900/50 p-2 rounded text-sm border-l-2 border-red-500"><span class="text-red-400 font-bold">Rojo/Naranja:</span> Alta interferencia</div>
+                        </div>
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h4 class="font-bold text-white mb-3 flex items-center"><i class="fas fa-tachometer-alt text-purple-400 mr-2"></i> 3. Data Rate</h4>
+                            <p class="text-sm text-gray-300 mb-2">Velocidad de modulación.</p>
+                            <div class="bg-gray-900/50 p-2 rounded text-sm mb-1 border-l-2 border-green-500"><span class="text-white font-bold">8x / 6x:</span> Óptimo</div>
+                            <div class="bg-gray-900/50 p-2 rounded text-sm border-l-2 border-yellow-500"><span class="text-white font-bold">4x / 1x:</span> Ruido (Causa Lag/Lentitud)</div>
+                        </div>
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h4 class="font-bold text-white mb-3 flex items-center"><i class="fas fa-ethernet text-yellow-400 mr-2"></i> 4. LAN Speed</h4>
+                            <p class="text-sm text-gray-300">Estado del cable Ethernet. Si marca <strong class="text-white">100 Mbps</strong>, ese es el tope físico, independientemente del plan contratado.</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-sm mt-6">
+                        <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-arrow-up text-green-400 mr-2"></i> Validar Aumento de Megas</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <ol class="list-decimal list-inside space-y-3 text-sm text-gray-300">
+                                <li>Revisar el rendimiento (capacidad) de ambos extremos. (Mínima variación = Bueno).</li>
+                                <li>Revisar la señal de ambas antenas para asegurar inclinación óptima.</li>
+                                <li>Desde el panel, buscar al cliente y hacer <strong>Speed Test</strong> (<code class="text-green-400 bg-gray-900 px-1 rounded">ubnt/FlyneT@1</code>).</li>
+                            </ol>
+                            <div class="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                                <h4 class="font-bold text-gray-400 mb-2 uppercase text-xs tracking-wider">Link Potential (Umbral)</h4>
+                                <div class="space-y-2">
+                                    <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span><span class="text-sm text-gray-300"><strong>> 20%:</strong> Óptimo pero justo.</span></div>
+                                    <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span><span class="text-sm text-gray-300"><strong>> 50%:</strong> Muy óptimo para aumentar.</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 TAB 3: FIBRA ÓPTICA (ONU)
+            =========================================== -->
+            <div id="tab-fibra" class="tab-pane absolute inset-0 flex-col overflow-y-auto p-8">
+                <div class="max-w-5xl mx-auto w-full space-y-6">
+                    <h2 class="text-2xl font-bold text-white mb-2">Fibra Óptica y ONU</h2>
+                    <p class="text-gray-400 mb-6">Diagnóstico y simulación de equipos C-DATA y ZTE F670L.</p>
+
+                    <!-- Simulador C-DATA -->
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-sm overflow-hidden mb-6">
+                        <div class="bg-gray-800/50 border-b border-gray-700 p-4">
+                            <h3 class="font-semibold text-white flex items-center"><i class="fas fa-hdd text-blue-400 mr-2"></i> Simulador Panel Frontal (C-DATA)</h3>
+                        </div>
+                        <div class="p-6 flex flex-col md:flex-row gap-8 items-center">
+                            <div class="flex-1 w-full space-y-5">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-400 mb-2">Estado Físico de la Fibra (Calle/Drop):</label>
+                                    <select id="sim-fibra-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" onchange="updateSimONU()">
+                                        <option value="optima">Óptima (Funcionando)</option>
+                                        <option value="auth">Autenticando (Iniciando / Alta Potencia)</option>
+                                        <option value="corte">Corte de Fibra (Cable Roto)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-400 mb-2">Estado del Router Cliente (LAN):</label>
+                                    <select id="sim-lan-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition" onchange="updateSimONU()">
+                                        <option value="conectado">Conectado (Encendido)</option>
+                                        <option value="desconectado">Desconectado (Cable suelto / Apagado)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Visual ONU -->
+                            <div class="bg-gray-300 p-5 rounded-xl shadow-inner w-full md:w-72 flex flex-col relative border border-gray-400">
+                                <div class="absolute top-2 left-4 font-black text-gray-700 tracking-wider text-sm">C-DATA</div>
+                                <div class="flex justify-between w-full mt-8 px-4">
+                                    <div class="flex flex-col items-center"><div id="onu-pwr" class="led green"></div><span class="text-[10px] font-bold text-gray-600 mt-2">PWR</span></div>
+                                    <div class="flex flex-col items-center"><div id="onu-pon" class="led green"></div><span class="text-[10px] font-bold text-gray-600 mt-2">PON</span></div>
+                                    <div class="flex flex-col items-center"><div id="onu-los" class="led off"></div><span class="text-[10px] font-bold text-gray-600 mt-2">LOS</span></div>
+                                    <div class="flex flex-col items-center"><div id="onu-lan" class="led green"></div><span class="text-[10px] font-bold text-gray-600 mt-2">LAN</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-900/50 p-4 border-t border-gray-700">
+                            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Diagnóstico para el Cliente:</p>
+                            <p id="sim-diag-text" class="text-sm text-green-400 font-medium">Conexión óptima. Enlace de fibra y router funcionando correctamente.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- ZTE F670L -->
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h3 class="font-bold text-white mb-3 text-lg">ZTE F670L (Todo en Uno)</h3>
+                            <p class="text-sm text-gray-300 mb-4">A diferencia de C-DATA, la fibra entra directo al router. No hay puerto/cable LAN intermedio.</p>
+                            <ul class="space-y-3 text-sm text-gray-400">
+                                <li class="flex items-start"><i class="fas fa-check-circle text-green-400 mt-1 mr-2"></i> <span><strong>Luz INTERNET Verde:</strong> PPPoE OK. Cliente navega.</span></li>
+                                <li class="flex items-start"><i class="fas fa-times-circle text-red-400 mt-1 mr-2"></i> <span><strong>Luz INTERNET Apagada/Roja:</strong> Fibra OK (PON fijo), pero PPPoE no conecta. Generalmente es corte por mora.</span></li>
+                                <li class="flex items-start"><i class="fas fa-info-circle text-blue-400 mt-1 mr-2"></i> <span>Para ver Rx Power: Web > Device Info > PON Interface. Ideal entre -15 y -25 dBm.</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- Descubrir Router / DMZ -->
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h3 class="font-bold text-white mb-3 text-lg">Acceso a Router Comercial (NAT)</h3>
+                            <p class="text-sm text-gray-300 mb-3">Si en la OLT o Antena aparece el cliente pero no puedes entrar a su router (ej. TP-Link):</p>
+                            <ol class="list-decimal list-inside space-y-2 text-sm text-gray-400">
+                                <li>Entra a la Antena / ONU.</li>
+                                <li>Busca la tabla ARP (Bridge Table) y copia la IP local (ej. <code class="text-yellow-400">192.168.1.20</code>).</li>
+                                <li>Ve a <strong>Port Forwarding</strong> y crea una regla:
+                                    <ul class="list-disc list-inside ml-6 mt-1 space-y-0.5 text-gray-500">
+                                        <li>IP Privada: IP copiada</li>
+                                        <li>Puerto Privado: 80</li>
+                                        <li>Puerto Público (Source): 8080</li>
+                                    </ul>
+                                </li>
+                                <li class="text-blue-300 font-medium mt-2">Abre navegador: <code class="bg-gray-900 px-1 rounded">http://[IP-ANTENA]:8080</code></li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 TAB 4: ROUTERS RUIJIE
+            =========================================== -->
+            <div id="tab-routers" class="tab-pane absolute inset-0 flex-col overflow-y-auto p-8">
+                <div class="max-w-4xl mx-auto w-full space-y-6">
+                    <h2 class="text-2xl font-bold text-white mb-6">Routers y Plataforma Ruijie</h2>
+                    
+                    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-sm">
+                        <h3 class="text-lg font-bold text-white mb-4 flex items-center"><i class="fas fa-cloud text-blue-400 mr-2"></i> Agregar Router a Ruijie Cloud</h3>
+                        <ol class="list-decimal list-inside space-y-4 text-sm text-gray-300">
+                            <li class="bg-gray-900/50 p-3 rounded border border-gray-700">Crear "Agregar Proyecto" en la nube.</li>
+                            <li class="bg-gray-900/50 p-3 rounded border border-gray-700">Alias del proyecto: <strong class="text-white">Credencial del cliente</strong> | Contraseña: <strong class="text-white">flynet@1</strong></li>
+                            <li class="bg-gray-900/50 p-3 rounded border border-gray-700">Seleccionar el escenario: <strong>Router Doméstico</strong>.</li>
+                            <li class="bg-gray-900/50 p-3 rounded border border-gray-700">Configurar la red Wi-Fi: Ajustar Contraseña y SSID a gusto del cliente. (Asegurar configurar Radio 1 [2.4G] y Radio 2 [5G]).</li>
+                            <li class="bg-gray-900/50 p-3 rounded border border-gray-700">Agregar dispositivo ingresando el número de serie (SN) del router. Alias = Contraseña PPPoE.</li>
+                        </ol>
+                    </div>
+
+                    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-sm">
+                        <h3 class="text-lg font-bold text-white mb-3">Análisis de Tráfico y Saturación (Desde Winbox)</h3>
+                        <p class="text-sm text-gray-400 mb-4">La saturación es relativa al plan contratado. Siempre compara el consumo en la interfaz con el perfil PPPoE del cliente.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="bg-gray-900/50 p-4 rounded-lg border-l-2 border-green-500">
+                                <h4 class="font-bold text-white mb-1">Consumo en kbps</h4>
+                                <p class="text-gray-400 text-xs">Tráfico mínimo o en reposo. El cliente no está saturando la red.</p>
+                            </div>
+                            <div class="bg-gray-900/50 p-4 rounded-lg border-l-2 border-red-500">
+                                <h4 class="font-bold text-white mb-1">Rozando Límite del Plan</h4>
+                                <p class="text-gray-400 text-xs">Ej. Plan 20M y consume 19.8M. Está descargando algo pesado. Se percibirá lento.</p>
+                            </div>
+                            <div class="bg-gray-900/50 p-4 rounded-lg border-l-2 border-yellow-500">
+                                <h4 class="font-bold text-white mb-1">0.00 Mbps y queja</h4>
+                                <p class="text-gray-400 text-xs">El router está colgado, PPPoE caído o falla de capa física en el trayecto.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 TAB 5: MIKROTIK
+            =========================================== -->
+            <div id="tab-mikrotik" class="tab-pane absolute inset-0 flex-col overflow-y-auto p-8">
+                <div class="max-w-5xl mx-auto w-full space-y-6">
+                    <h2 class="text-2xl font-bold text-white mb-6">Administración MikroTik & Teoría de Red</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <!-- Queues -->
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h3 class="text-lg font-bold text-blue-400 mb-3"><i class="fas fa-list-ol mr-2"></i> Control de Tráfico (Queues)</h3>
+                            <p class="text-sm text-gray-300 mb-3">Asignan ancho de banda y aplican QoS (priorizando Datos, Voz o Video).</p>
+                            <ul class="space-y-2 text-sm text-gray-400 list-disc list-inside">
+                                <li><strong class="text-white">Orden Secuencial:</strong> La regla 1 se ejecuta antes que la 10. La primera coincidencia se aplica.</li>
+                                <li><strong class="text-white">PCQ (Per Connection Queue):</strong> Divide el ancho de banda padre de forma dinámica y equitativa entre todos los usuarios activos.</li>
+                                <li><strong class="text-white">Burst (El Buffeo):</strong> Otorga un pico de velocidad temporal si el usuario no venía consumiendo internet, acelerando la carga inicial de páginas.</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Capas OSI -->
+                        <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                            <h3 class="text-lg font-bold text-blue-400 mb-3"><i class="fas fa-layer-group mr-2"></i> Tipos de Falla (Generación de Tickets)</h3>
+                            <div class="space-y-3 text-sm">
+                                <div class="flex items-start">
+                                    <div class="bg-red-500/20 text-red-400 px-2 py-1 rounded font-bold mr-3 text-xs">Capa 1</div>
+                                    <p class="text-gray-400"><strong class="text-gray-300">Física:</strong> Cable roto, luz LOS roja, sin energía en nodo. <em>Requiere técnico en sitio.</em></p>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded font-bold mr-3 text-xs">Capa 2</div>
+                                    <p class="text-gray-400"><strong class="text-gray-300">Enlace (MAC):</strong> Falla PPPoE (clave errónea), MAC inválida o Loop de red. <em>Diagnóstico en NOC.</em></p>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="bg-green-500/20 text-green-400 px-2 py-1 rounded font-bold mr-3 text-xs">Capa 3</div>
+                                    <p class="text-gray-400"><strong class="text-gray-300">Red (IP):</strong> PPPoE activo pero sin IP, error de enrutamiento o Pool lleno. <em>Diagnóstico en NOC.</em></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
+                        <h3 class="text-lg font-bold text-white mb-3">Diccionario Rápido</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div><strong class="text-blue-400 block mb-1">VLAN Q-in-Q</strong><span class="text-gray-400">Una VLAN metida dentro de otra VLAN. Permite aislar tráfico de ISPs en una misma red física.</span></div>
+                            <div><strong class="text-blue-400 block mb-1">Jumbo Frames</strong><span class="text-gray-400">Paquetes mayores al MTU estándar (1500 bytes) para enviar más datos de golpe sin fragmentar en el Core.</span></div>
+                            <div><strong class="text-blue-400 block mb-1">IP -> Neighbors</strong><span class="text-gray-400">Pestaña para escanear qué equipos físicos (con MAC) están directamente conectados a los puertos del MikroTik.</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 TAB 6: TOPOLOGÍA CABAL (INTERACTIVO)
+            =========================================== -->
+            <div id="tab-cabal" class="tab-pane absolute inset-0 flex-col overflow-hidden bg-gray-900">
+                <!-- Header Cabal -->
+                <div class="h-20 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-6 shrink-0 z-10 shadow-md">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center"><i class="fas fa-route text-blue-500 mr-2"></i> Entrenamiento NOC: Redundancia CABAL</h2>
+                        <p class="text-xs text-gray-400">Simulador interactivo de failover y prevención de Loops Capa 2.</p>
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="bg-gray-900/80 border border-gray-700 px-4 py-2 rounded-lg text-center">
+                            <span class="block text-[10px] text-gray-400 uppercase tracking-widest">Estado Red</span>
+                            <span id="cabal-net-status" class="font-bold text-green-400 text-sm">ÓPTIMA</span>
+                        </div>
+                        <div class="bg-gray-900/80 border border-gray-700 px-4 py-2 rounded-lg text-center">
+                            <span class="block text-[10px] text-gray-400 uppercase tracking-widest">Estado Cliente</span>
+                            <span id="cabal-client-status" class="font-bold text-green-400 text-sm">EN LÍNEA</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Cabal Area -->
+                <div class="flex-1 flex flex-col md:flex-row relative min-h-0">
+                    
+                    <!-- Panel Control Izquierdo (Fijo) -->
+                    <div class="w-full md:w-80 bg-gray-800 border-r border-gray-700 flex flex-col z-20 shrink-0 shadow-xl overflow-hidden h-full">
+                        <div class="p-5 border-b border-gray-700 shrink-0">
+                            <h3 class="font-bold text-white mb-4"><i class="fas fa-tools text-gray-400 mr-2"></i> Controles Winbox</h3>
+                            
+                            <!-- Comalapa Switch -->
+                            <div class="bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700/50">
+                                <p class="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider">Nodo Comalapa (Principal)</p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-300">Puerto Redes Litorales</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="cabal-btn-comalapa" class="sr-only peer toggle-checkbox" checked onchange="updateSimulationCabal()">
+                                        <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- 317 Switch -->
+                            <div class="bg-gray-900 rounded-lg p-4 mb-6 border border-gray-700/50">
+                                <p class="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider">Nodo 317 (Respaldo)</p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-300">Puerto Fibra IBW</span>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="cabal-btn-317" class="sr-only peer toggle-checkbox" onchange="updateSimulationCabal()">
+                                        <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Boton Físico -->
+                            <h3 class="font-bold text-white mb-3 flex items-center"><i class="fas fa-radiation text-red-500 mr-2"></i> Eventos Físicos</h3>
+                            <button id="btn-cut-fiber-cabal" onclick="toggleFiberCutCabal()" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors shadow-lg">
+                                <i class="fas fa-cut mr-2"></i> Cortar Fibra Comalapa
+                            </button>
+                        </div>
+
+                        <!-- Log Area (Scrollable Internamente) -->
+                        <div class="flex-1 flex flex-col min-h-0 bg-[#1e1e1e] p-4">
+                            <p class="text-[10px] font-bold text-gray-500 mb-3 uppercase tracking-wider shrink-0">Log Operaciones (VLAN 3516)</p>
+                            <div id="cabal-log-box" class="flex-1 overflow-y-auto font-mono text-[11px] space-y-2 pr-2 pb-4 text-gray-300">
+                                <div class="text-green-400">> Sistema iniciado. Tráfico vía Comalapa (Ruta Principal).</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SVG Map Area (Fijo, No scroll) -->
+                    <div class="flex-1 relative overflow-hidden bg-[#0B0F19]" id="cabal-diagram-area">
+                        <!-- SVG Lines -->
+                        <svg class="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+                            <line x1="25%" y1="20%" x2="50%" y2="20%" class="link-line flow-active" />
+                            <line x1="50%" y1="20%" x2="50%" y2="45%" class="link-line flow-active" />
+                            <line x1="50%" y1="45%" x2="25%" y2="45%" class="link-line opacity-20" />
+                            <line id="line-anillo-comalapa" x1="50%" y1="45%" x2="75%" y2="45%" class="link-line flow-active" />
+                            <line id="line-comalapa-cabal" x1="75%" y1="45%" x2="75%" y2="75%" class="link-line flow-active" />
+                            <line id="line-anillo-317" x1="50%" y1="45%" x2="50%" y2="75%" class="link-line opacity-20" />
+                            <line id="line-317-cabal" x1="50%" y1="75%" x2="75%" y2="75%" class="link-line opacity-20" />
+                        </svg>
+
+                        <!-- Labels SVG -->
+                        <div class="absolute top-[30%] left-[53%] text-[10px] font-mono font-bold text-blue-300 bg-gray-900 border border-gray-700 px-1.5 py-0.5 rounded z-10">VLAN 3516</div>
+                        <div class="absolute top-[60%] left-[76%] text-xs text-gray-400 bg-gray-900 border border-gray-800 px-2 py-1 rounded z-10 whitespace-nowrap"><i class="fas fa-caret-down text-blue-500 mr-1"></i> Fibra CABAL</div>
+                        <div class="absolute top-[77%] left-[62%] text-xs text-gray-400 bg-gray-900 border border-gray-800 px-2 py-1 rounded z-10 whitespace-nowrap"><i class="fas fa-caret-right text-yellow-500 mr-1"></i> Fibra IBW</div>
+
+                        <!-- Nodes HTML -->
+                        <div class="node" style="top: 20%; left: 25%;">Miami</div>
+                        <div class="node" style="top: 20%; left: 50%;">BGP SSA</div>
+                        <div class="node node-offline" style="top: 45%; left: 25%;">Apopa</div>
+                        <div class="node" style="top: 45%; left: 50%;">SW F Anillo SSA</div>
+                        <div class="node" style="top: 45%; left: 75%;">Comalapa</div>
+                        <div class="node" style="top: 75%; left: 50%;">Nodo 317</div>
+                        <div class="node node-cabal-online" id="node-cabal" style="top: 75%; left: 75%; width: 140px; padding: 15px;">
+                            <i class="far fa-building text-2xl mb-1.5 block opacity-80"></i>
+                            <span class="text-sm font-black tracking-wide">CABAL</span><br>
+                            <span class="text-[9px] font-normal text-gray-400 mt-1 block">(Redes Litorales)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================
+                 TAB 7: NOCHE Y UFINET
+            =========================================== -->
+            <div id="tab-noche" class="tab-pane absolute inset-0 flex-col overflow-y-auto p-8">
+                <div class="max-w-4xl mx-auto w-full space-y-6">
+                    <h2 class="text-2xl font-bold text-white mb-6">Operaciones Especiales y Noche</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Noche -->
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-sm relative overflow-hidden">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                            <h3 class="text-xl font-bold text-yellow-400 mb-4 flex items-center"><i class="fas fa-moon mr-3"></i> Protocolo Nocturno</h3>
+                            <ul class="space-y-4 text-sm text-gray-300">
+                                <li class="flex items-start"><i class="fas fa-edit text-gray-500 mt-1 mr-3"></i> Llevar un hilo (registro escrito) de todos los incidentes relevantes de la noche.</li>
+                                <li class="flex items-start"><i class="fas fa-building text-gray-500 mt-1 mr-3"></i> <strong>Grupo Lorena:</strong> Si NO es de San Miguel, no contactar. Si es de SM, revisar Capa 2 previo a escalar.</li>
+                                <li class="flex items-start"><i class="fas fa-eye text-gray-500 mt-1 mr-3"></i> Monitoreo constante de: Caídas de Torre, Cortes Energía, Degradaciones y Nodos inactivos.</li>
+                                <li class="flex items-start"><i class="fas fa-power-off text-green-400 mt-1 mr-3"></i> <strong>Acción Permitida:</strong> Puedes reiniciar las OLT de "El Gigante" y "El Rosario" si la situación lo exige.</li>
+                                <li class="flex items-start"><i class="fas fa-ban text-red-400 mt-1 mr-3"></i> <strong>KingPalace Parqueo:</strong> Si se cae, IGNORAR hasta que cliente lo reporte.</li>
+                            </ul>
+                        </div>
+
+                        <!-- UFINET -->
+                        <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-sm relative overflow-hidden">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                            <h3 class="text-xl font-bold text-red-400 mb-4 flex items-center"><i class="fas fa-exclamation-triangle mr-3"></i> Casos Críticos / UFINET</h3>
+                            
+                            <h4 class="font-bold text-white text-sm mb-2">Generar Ticket UFINET:</h4>
+                            <ol class="list-decimal list-inside space-y-2 text-sm text-gray-300 mb-6 bg-gray-900/50 p-4 rounded-lg">
+                                <li>Ir al <strong>DASHBOARD</strong> > <strong>OLTID SERVICIOS</strong></li>
+                                <li>Buscar por nombre de nodo afectado.</li>
+                                <li>Extraer información y abrir ticket con el carrier.</li>
+                            </ol>
+
+                            <h4 class="font-bold text-white text-sm mb-2">Avisos Importantes:</h4>
+                            <div class="space-y-3">
+                                <div class="bg-blue-900/20 border border-blue-800/50 p-3 rounded-lg flex items-start">
+                                    <i class="fas fa-info-circle text-blue-400 mt-0.5 mr-3"></i>
+                                    <p class="text-sm text-blue-200"><strong>Kilo 5:</strong> Recordar que hay equipo (Nema) de UFINET en esa ubicación.</p>
+                                </div>
+                                <div class="bg-red-900/20 border border-red-800/50 p-3 rounded-lg flex items-start">
+                                    <i class="fas fa-radiation text-red-400 mt-0.5 mr-3"></i>
+                                    <p class="text-sm text-red-200"><strong>PELIGRO:</strong> Caída de redundancia en la Barra de Santiago requiere atención inmediata.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Lógica de Pestañas (SPA)
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById('btn-' + tabId).classList.add('active');
+
+            // Actualizar Título del Header según pestaña
+            const titles = {
+                'tab-dashboard': 'Dashboard Principal',
+                'tab-antenas': 'Soporte: Antenas Ubiquiti',
+                'tab-fibra': 'Soporte: Fibra Óptica (ONU)',
+                'tab-routers': 'Gestión de Routers',
+                'tab-mikrotik': 'Administración MikroTik',
+                'tab-cabal': 'Topología CABAL',
+                'tab-noche': 'Operaciones Nocturnas'
+            };
+            document.getElementById('header-title').textContent = titles[tabId];
+        }
+
+        // Lógica del Sidebar Colapsable
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+        }
+
+        // Utilidad de Copiar Portapapeles
+        function copyText(text) {
+            const tempInput = document.createElement("input");
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+        }
+
+        // Reloj en tiempo real (FORMATO 12 HORAS)
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('es-SV', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const dateStr = now.toLocaleDateString('es-SV', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
+            
+            document.getElementById('clock-time').textContent = timeStr;
+            document.getElementById('clock-date').textContent = dateStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // -----------------------------------------------------
+        // LÓGICA SIMULADOR ONU FRONT PANEL
+        // -----------------------------------------------------
+        function updateSimONU() {
+            const f = document.getElementById('sim-fibra-select').value;
+            const l = document.getElementById('sim-lan-select').value;
+            
+            const lPon = document.getElementById('onu-pon');
+            const lLos = document.getElementById('onu-los');
+            const lLan = document.getElementById('onu-lan');
+            const textDiag = document.getElementById('sim-diag-text');
+
+            // Resets
+            lPon.className = 'led off';
+            lLos.className = 'led off';
+            lLan.className = 'led off';
+
+            let msg = ""; let msgColor = "text-gray-300";
+
+            if(f === 'optima') {
+                lPon.className = 'led green';
+                msg = "Fibra óptica recibiendo luz correctamente. ";
+                msgColor = "text-green-400";
+            } else if (f === 'auth') {
+                lPon.className = 'led blink-green';
+                msg = "Autenticando con OLT. Espere... ";
+                msgColor = "text-yellow-400";
+            } else if (f === 'corte') {
+                lLos.className = 'led blink-red';
+                msg = "Corte de fibra física o equipo PON apagado. ";
+                msgColor = "text-red-500 font-bold";
+            }
+
+            if(l === 'conectado') {
+                lLan.className = 'led green';
+                if(f === 'optima') msg = "Conexión óptima. Enlace de fibra y router funcionando correctamente.";
+            } else {
+                msg += " Cable de red hacia el router desconectado o router apagado.";
+                if(f === 'optima') msgColor = "text-yellow-400";
+            }
+
+            textDiag.textContent = msg;
+            textDiag.className = `text-sm font-medium ${msgColor}`;
+        }
+
+        // -----------------------------------------------------
+        // LÓGICA SIMULADOR CABAL REDUNDANCIA
+        // -----------------------------------------------------
+        let isComalapaFiberCut = false;
+        
+        function logMsgCabal(msg, type = 'info') {
+            const logBox = document.getElementById('cabal-log-box');
+            const div = document.createElement('div');
+            
+            let color = 'text-gray-300';
+            if(type === 'error') color = 'text-red-400 font-bold';
+            if(type === 'success') color = 'text-green-400';
+            if(type === 'warning') color = 'text-yellow-400 font-medium';
+
+            const time = new Date().toLocaleTimeString('es-SV', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            div.className = color + " break-words";
+            div.innerHTML = `<span class="text-gray-600 font-mono tracking-tight mr-1">[${time}]</span> ${msg}`;
+            
+            logBox.appendChild(div);
+            logBox.scrollTop = logBox.scrollHeight; 
+        }
+
+        function toggleFiberCutCabal() {
+            isComalapaFiberCut = !isComalapaFiberCut;
+            const btn = document.getElementById('btn-cut-fiber-cabal');
+            
+            if (isComalapaFiberCut) {
+                btn.classList.replace('bg-red-600', 'bg-green-600');
+                btn.classList.replace('hover:bg-red-700', 'hover:bg-green-700');
+                btn.innerHTML = '<i class="fas fa-tools mr-2"></i> Reparar Fibra Comalapa';
+                logMsgCabal('> ALARMA: Corte de fibra física detectado en ruta Comalapa.', 'error');
+            } else {
+                btn.classList.replace('bg-green-600', 'bg-red-600');
+                btn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+                btn.innerHTML = '<i class="fas fa-cut mr-2"></i> Cortar Fibra Comalapa';
+                logMsgCabal('> INFO: Fibra física en ruta Comalapa ha sido reparada.', 'success');
+            }
+            updateSimulationCabal();
+        }
+
+        function updateSimulationCabal() {
+            const portComalapa = document.getElementById('cabal-btn-comalapa').checked;
+            const port317 = document.getElementById('cabal-btn-317').checked;
+            
+            const lineAC = document.getElementById('line-anillo-comalapa');
+            const lineCC = document.getElementById('line-comalapa-cabal');
+            const lineA3 = document.getElementById('line-anillo-317');
+            const line3C = document.getElementById('line-317-cabal');
+            
+            const nodeCabal = document.getElementById('node-cabal');
+            const diagramArea = document.getElementById('cabal-diagram-area');
+            const netStatus = document.getElementById('cabal-net-status');
+            const clientStatus = document.getElementById('cabal-client-status');
+
+            if (portComalapa && port317 && !isComalapaFiberCut) {
+                lineAC.className.baseVal = "link-line flow-loop";
+                lineCC.className.baseVal = "link-line flow-loop";
+                lineA3.className.baseVal = "link-line flow-loop";
+                line3C.className.baseVal = "link-line flow-loop";
+                
+                diagramArea.classList.add('screen-loop');
+                nodeCabal.className = "node node-cabal-offline";
+                
+                netStatus.textContent = "¡CAÍDA MASIVA (LOOP)!";
+                netStatus.className = "font-bold text-red-500 text-sm animate-pulse";
+                clientStatus.textContent = "INACCESIBLE";
+                clientStatus.className = "font-bold text-red-500 text-sm";
+                
+                logMsgCabal('> CRÍTICO: Bucle de Capa 2 detectado. Tormenta de Broadcast. ¡APAGUE UN PUERTO!', 'error');
+                return; 
+            }
+
+            diagramArea.classList.remove('screen-loop');
+
+            const pathA_Logical = portComalapa;
+            const pathA_Physical = !isComalapaFiberCut;
+            const pathA_Active = pathA_Logical && pathA_Physical;
+
+            const pathB_Active = port317;
+
+            if (pathA_Active) {
+                lineAC.className.baseVal = "link-line flow-active";
+                lineCC.className.baseVal = "link-line flow-active";
+            } else if (pathA_Logical && isComalapaFiberCut) {
+                lineAC.className.baseVal = "link-line flow-active"; 
+                lineCC.className.baseVal = "link-line flow-cut";    
+            } else {
+                lineAC.className.baseVal = "link-line opacity-20";
+                lineCC.className.baseVal = "link-line opacity-20";
+            }
+
+            if (pathB_Active) {
+                lineA3.className.baseVal = "link-line flow-backup";
+                line3C.className.baseVal = "link-line flow-backup";
+            } else {
+                lineA3.className.baseVal = "link-line opacity-20";
+                line3C.className.baseVal = "link-line opacity-20";
+            }
+
+            if (pathA_Active || pathB_Active) {
+                nodeCabal.className = "node node-cabal-online";
+                clientStatus.textContent = "EN LÍNEA";
+                clientStatus.className = "font-bold text-green-400 text-sm";
+                netStatus.textContent = "ÓPTIMA";
+                netStatus.className = "font-bold text-green-400 text-sm";
+
+                if (pathB_Active && !pathA_Active) {
+                    logMsgCabal('> Tráfico vía Nodo 317 (Ruta de Respaldo IBW).', 'warning');
+                    netStatus.textContent = "RESPALDO ACTIVO";
+                    netStatus.className = "font-bold text-yellow-500 text-sm";
+                } else if (pathA_Active && !pathB_Active) {
+                    logMsgCabal('> Tráfico vía Comalapa (Ruta Principal).', 'success');
+                }
+            } else {
+                nodeCabal.className = "node node-cabal-offline";
+                clientStatus.textContent = "FUERA DE LÍNEA";
+                clientStatus.className = "font-bold text-red-500 text-sm animate-pulse";
+                netStatus.textContent = "CLIENTE CAÍDO";
+                netStatus.className = "font-bold text-red-500 text-sm";
+                logMsgCabal('> CABAL sin internet. Ninguna ruta activa.', 'error');
+            }
+        }
+    </script>
+</body>
+</html>
